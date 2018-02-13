@@ -1,0 +1,96 @@
+install.packages('caTools')
+library(caTools)
+dataDS = data.frame(read.csv("c:/Users/mr.vicky29/Desktop/527/Project/speed-dating-experiment/Speed Dating Data_WP.csv",header=T))
+# missing values handling
+i =1
+while(i < ncol(dataDS))
+{
+dataDS[,i] = ifelse(is.na(dataDS[,i]),
+ave(dataDS[,i], FUN = function(x) mean(x, na.rm = TRUE)), dataDS[,i])
+i = i+1
+}
+# missing values check
+missingValues=function(a){
+dataFrame = data.frame(a)
+dataFrame1 = data.frame()
+for(i in 1:ncol(a)){
+dataFrame1[i,1]=colnames(dataFrame[i])
+dataFrame1[i,2]=sum(is.na(dataFrame[,i]))
+dataFrame1[i,3]=round((100*dataFrame1[i,2])/(length(dataFrame[,i])),2)
+}
+colnames(dataFrame1)=c("col_name","missing values","percentage missing")
+return(dataFrame1)
+}
+missingValues(dataDS)
+
+#split data set
+split <- sample.split(dataDS$dec, SplitRatio = 0.75)
+trainDS <- subset(dataDS, split == TRUE)
+testDS <- subset(dataDS, split == FALSE)
+
+#hardcoding
+trainDS = read.csv("c:/Users/mr.vicky29/Desktop/527/Project/trainingDS.csv",header=T)
+trainDS = read.csv("c:/Users/mr.vicky29/Desktop/527/Project/testingDS.csv",header=T)
+
+dec  = trainDS[,1]
+ attr  = trainDS[,2]
+ sinc  = trainDS[,3]
+ intel  = trainDS[,4]
+ fun  = trainDS[,5]
+ amb  = trainDS[,6]
+ shar  = trainDS[,7]
+
+model_fit =glm(dec~attr+sinc+intel+fun+amb+shar,family="binomial")
+
+#model selection
+step(model_fit,direction="backward",trace=T)
+base = glm(dec ~ attr, data= dataSD, family = "binomial")
+step(base, scope= list(upper=model_fit, lower=~1), direction="forward", trace=F)
+model = step(base, scope= list(upper=model_fit, lower=~1), direction="both", trace=F)
+
+#Residual analysis
+plot( fitted(model), rstandard(model), main="Predicted vs residuals plot")
+abline(a=0, b=0, col='red')
+
+#variable importance
+varImp(model_fit)
+predict <- predict(model, type = 'response')
+table(trainDS[,1], predict > 0.5)
+pred = predict(model, type = 'response', newdata = testDS[,2:7])
+table(testDS[,1], predict > 0.5)
+
+#attribute importance
+boxplot(trainDS[,2:7], xlab='Attributes',ylab='Rating',main='Importance of Attributes')
+
+myPrediction = predict(model,trainDS)
+myPrediction[myPrediction <= 0.5] = 0
+myPrediction[myPrediction > 0.5] = 1
+
+# generating the confusion matrix
+confMat = xtabs(~myPrediction + trainDS$dec)
+confMat[,1] = confMat[,1]/sum(confMat[,1])
+confMat[,2] = confMat[,2]/sum(confMat[,2])
+myAcc = sum(diag(confMat))/sum(confMat)
+confMat
+myAcc
+
+# variance importance
+install.packages('caret')
+ library(caret)
+ varImp(model_fit)
+
+# ROC
+predict <- predict(model, type = 'response')
+library(ROCR)
+ROCRpred <- prediction(predict, dresstrain$Recommended)
+ROCRperf <- performance(ROCRpred, 'tpr','fpr')
+plot(ROCRperf, colorize = TRUE, text.adj = c(-0.2,1.7))
+
+# R-Square value
+install.packages('pscl')
+library(pscl)
+pR2(model_fit)
+
+#hypothesis testing
+install.packages('BSDA')
+z.test(male,female, alternative = "two.sided", mu = 0, sigma.x = sd(male),sigma.y = sd(female), conf.level = 0.95)
